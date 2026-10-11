@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Job Management</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="job-change-toast-container" id="jobChangeToastContainer"></div>
+
+<div id="app" class="hidden">
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-grid"></div>
+
+  <div class="panel">
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-briefcase"></i></div>
+        <div class="brand-text">
+          <h1 data-i18n="app_title">Job Management</h1>
+          <span data-i18n="app_subtitle">Jobs, Ränge &amp; Firmenkonten in Echtzeit verwalten</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Job suchen..." data-i18n-placeholder="ph_search_job">
+        </div>
+
+        <div class="filter-box">
+          <i class="fa-solid fa-filter"></i>
+          <select id="filterSelect">
+            <option value="all" data-i18n="opt_all_jobs">Alle Jobs</option>
+            <option value="whitelisted" data-i18n="ui_whitelisted">Whitelisted</option>
+            <option value="public" data-i18n="ui_status_public">Öffentlich</option>
+            <option value="society" data-i18n="opt_society">Mit Firmenkonto</option>
+          </select>
+        </div>
+
+        <button class="btn btn-secondary" id="characterManagementBtn">
+          <i class="fa-solid fa-user-gear"></i><span data-i18n="btn_characters">Charaktere</span>
+        </button>
+
+        <button class="btn btn-primary" id="newJobBtn">
+          <i class="fa-solid fa-plus"></i><span data-i18n="ui_new_job">Neuer Job</span>
+        </button>
+
+        <button class="btn-icon" id="closeBtn" title="Schließen (ESC)" data-i18n-title="title_close_esc">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <aside class="sidebar">
+        <div class="sidebar-stats">
+          <div class="stat-chip">
+            <span id="statTotalJobs">0</span>
+            <label data-i18n="stat_jobs">Jobs</label>
+          </div>
+          <div class="stat-chip stat-chip-online">
+            <span id="statOnline">0</span>
+            <label data-i18n="ui_online">Online</label>
+          </div>
+          <div class="stat-chip stat-chip-lock">
+            <span id="statWhitelisted">0</span>
+            <label data-i18n="ui_whitelisted">Whitelisted</label>
+          </div>
+        </div>
+
+        <div class="job-list" id="jobList">
+
+        </div>
+      </aside>
+
+      <main class="main" id="main">
+
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon"><i class="fa-solid fa-people-group"></i></div>
+          <h2 data-i18n="empty_title">Kein Job ausgewählt</h2>
+          <p data-i18n="empty_text">Wähle links einen Job aus der Liste aus oder erstelle einen neuen Job, um loszulegen.</p>
+        </div>
+
+        <div class="job-detail hidden" id="jobDetail">
+
+          <div class="detail-header">
+            <div class="detail-title">
+              <div class="job-avatar" id="detailAvatar">?</div>
+              <div>
+                <h2 id="detailLabel" data-i18n="detail_label_default">Job Label</h2>
+                <span id="detailName">job_name</span>
+              </div>
+            </div>
+            <div class="detail-actions">
+              <button class="btn btn-secondary" id="createOfflineJobBtn" title="Erstellt automatisch einen Offline-Job (off&lt;jobname&gt;) mit denselben Rängen, Label &quot;Off-Duty&quot; und $750 Gehalt" data-i18n-title="ui_offline_title_attr">
+                <i class="fa-solid fa-user-clock"></i><span data-i18n="ui_confirm_offline_title">Offline-Job erstellen</span>
+              </button>
+              <button class="btn btn-danger" id="deleteJobBtn">
+                <i class="fa-solid fa-trash"></i><span data-i18n="ui_confirm_delete_job_title">Job löschen</span>
+              </button>
+            </div>
+          </div>
+
+          <nav class="tabs" id="tabs">
+            <button class="tab active" data-tab="overview"><i class="fa-solid fa-sliders"></i> <span data-i18n="tab_overview">Übersicht</span></button>
+            <button class="tab" data-tab="grades"><i class="fa-solid fa-ranking-star"></i> <span data-i18n="tab_grades">Ränge</span></button>
+            <button class="tab" data-tab="society"><i class="fa-solid fa-building-columns"></i> <span data-i18n="tab_society">Firmenkonto</span></button>
+            <button class="tab" data-tab="players"><i class="fa-solid fa-users"></i> <span data-i18n="tab_players">Online-Spieler</span></button>
+            <button class="tab" data-tab="applications"><i class="fa-solid fa-file-signature"></i> <span data-i18n="tab_applications">Bewerbungen</span> <span class="count-pill" id="adApplicationsOpenCount">0</span></button>
+          </nav>
+
+          <section class="tab-content active" id="tab-overview">
+            <div class="card">
+              <div class="card-title"><i class="fa-solid fa-circle-info"></i> <span data-i18n="card_basics">Basisdaten</span></div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label data-i18n="lbl_job_label">Job-Label (Anzeigename)</label>
+                  <input type="text" id="ovLabel" placeholder="z. B. Polizei" data-i18n-placeholder="ph_e_g_police">
+                </div>
+                <div class="form-group">
+                  <label data-i18n="lbl_job_name">Job-Name (intern)</label>
+                  <input type="text" id="ovName" placeholder="z. B. police" data-i18n-placeholder="ph_e_g_police_name">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label data-i18n="lbl_desc_jc">Beschreibung (für das Arbeitsamt)</label>
+                <textarea id="ovDescription" rows="3" placeholder="Kurze Beschreibung dieses Jobs, sichtbar im Arbeitsamt..." data-i18n-placeholder="ph_short_desc_jc"></textarea>
+              </div>
+
+              <div class="switch-row">
+                <div class="switch-info">
+                  <i class="fa-solid fa-lock"></i>
+                  <div>
+                    <strong data-i18n="ui_whitelisted">Whitelisted</strong>
+                    <span data-i18n="whitelisted_desc">Job kann nur von berechtigten Spielern angenommen werden</span>
+                  </div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="ovWhitelisted">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="card-actions">
+              <button class="btn btn-primary btn-lg" id="saveJobBtn">
+                <i class="fa-solid fa-floppy-disk"></i><span data-i18n="btn_save_changes">Änderungen speichern</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="tab-content" id="tab-grades">
+            <div class="card">
+              <div class="card-title-row">
+                <div class="card-title"><i class="fa-solid fa-ranking-star"></i> <span data-i18n="tab_grades">Ränge</span></div>
+                <button class="btn btn-primary btn-sm" id="addGradeBtn">
+                  <i class="fa-solid fa-plus"></i><span data-i18n="ui_add_grade">Folgerang erstellen</span>
+                </button>
+              </div>
+              <p class="grades-hint"><i class="fa-solid fa-circle-info"></i> <span data-i18n-html="ui_grades_hint"></span></p>
+
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th class="th-drag"></th>
+                      <th data-i18n="th_grade">Grade</th>
+                      <th data-i18n="th_name_internal">Name (intern)</th>
+                      <th data-i18n="th_label">Label</th>
+                      <th data-i18n="th_salary">Gehalt</th>
+                      <th class="th-actions" data-i18n="th_actions">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="gradesTableBody"></tbody>
+                </table>
+                <div class="table-empty hidden" id="gradesEmpty">
+                  <i class="fa-solid fa-inbox"></i>
+                  <span data-i18n="grades_empty">Noch keine Ränge angelegt</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-content" id="tab-society">
+            <div class="card">
+              <div class="card-title"><i class="fa-solid fa-building-columns"></i> <span data-i18n="tab_society">Firmenkonto</span></div>
+
+              <div class="society-balance">
+                <span class="society-balance-label" data-i18n="soc_balance_label">Aktueller Kontostand</span>
+                <span class="society-balance-value" id="socBalance">$0</span>
+                <span class="society-account-name" id="socAccountName">society_job</span>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label data-i18n="lbl_account_label">Konto-Label</label>
+                  <input type="text" id="socLabel" placeholder="z. B. Polizei Kasse" data-i18n-placeholder="ph_e_g_police_account">
+                </div>
+              </div>
+
+              <div class="switch-row">
+                <div class="switch-info">
+                  <i class="fa-solid fa-users-viewfinder"></i>
+                  <div>
+                    <strong data-i18n="soc_shared">Geteiltes Konto (shared)</strong>
+                    <span data-i18n="soc_shared_desc">Alle Mitarbeiter greifen auf dieselbe Kasse zu</span>
+                  </div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="socShared">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="society-money-actions">
+                <div class="form-group">
+                  <label data-i18n="lbl_amount">Betrag</label>
+                  <input type="number" id="socAmount" placeholder="0" min="0">
+                </div>
+                <div class="society-buttons">
+                  <button class="btn btn-success" id="socAddBtn"><i class="fa-solid fa-plus"></i> <span data-i18n="btn_add">Hinzufügen</span></button>
+                  <button class="btn btn-danger" id="socRemoveBtn"><i class="fa-solid fa-minus"></i> <span data-i18n="btn_remove">Entfernen</span></button>
+                  <button class="btn btn-secondary" id="socSetBtn"><i class="fa-solid fa-equals"></i> <span data-i18n="btn_set">Festlegen</span></button>
+                </div>
+              </div>
+
+              <div class="card-actions">
+                <button class="btn btn-primary btn-lg" id="saveSocietyBtn">
+                  <i class="fa-solid fa-floppy-disk"></i><span data-i18n="btn_save_account">Konto speichern</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-content" id="tab-players">
+            <div class="card">
+              <div class="card-title-row">
+                <div class="card-title"><i class="fa-solid fa-users"></i> <span data-i18n="tab_players">Online-Spieler</span> <span class="count-pill" id="playersCount">0</span></div>
+                <div class="players-controls">
+                  <select id="playersGradeFilter">
+                    <option value="all" data-i18n="ui_all_grades">Alle Ränge</option>
+                  </select>
+                  <button class="btn-icon" id="refreshPlayersBtn" title="Aktualisieren" data-i18n-title="title_refresh">
+                    <i class="fa-solid fa-rotate"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="players-list" id="playersList"></div>
+              <div class="table-empty hidden" id="playersEmpty">
+                <i class="fa-solid fa-user-slash"></i>
+                <span data-i18n="players_empty">Kein Spieler mit diesem Job online</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-content" id="tab-applications">
+            <div class="card">
+              <div class="card-title"><i class="fa-solid fa-file-signature"></i> <span data-i18n="card_app_phase">Bewerbungsphase</span></div>
+              <div class="switch-row">
+                <div class="switch-info">
+                  <i class="fa-solid fa-door-open"></i>
+                  <div>
+                    <strong data-i18n="app_phase_open">Bewerbungsphase geöffnet</strong>
+                    <span data-i18n="app_phase_open_desc">Solange geöffnet, können Spieler im Arbeitsamt eine Bewerbung für diesen Job schreiben</span>
+                  </div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="adOpen">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label data-i18n="lbl_job_ad">Stellenausschreibung (welche Stellen werden gesucht?)</label>
+                <textarea id="adText" rows="3" placeholder="z. B. Wir suchen aktuell Verstärkung im Streifendienst..." data-i18n-placeholder="ph_job_ad"></textarea>
+              </div>
+              <div class="card-actions">
+                <button class="btn btn-primary btn-lg" id="adSaveBtn">
+                  <i class="fa-solid fa-floppy-disk"></i><span data-i18n="btn_save">Speichern</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title-row">
+                <div class="card-title"><i class="fa-solid fa-inbox"></i> <span data-i18n="card_received_apps">Eingegangene Bewerbungen</span> <span class="count-pill" id="adApplicationsCount">0</span></div>
+                <button class="btn-icon" id="adApplicationsRefreshBtn" title="Aktualisieren" data-i18n-title="title_refresh">
+                  <i class="fa-solid fa-rotate"></i>
+                </button>
+              </div>
+              <div class="applications-list" id="adApplicationsList"></div>
+              <div class="table-empty hidden" id="adApplicationsEmpty">
+                <i class="fa-solid fa-inbox"></i>
+                <span data-i18n="apps_empty">Noch keine Bewerbungen eingegangen</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<div id="employerApp" class="hidden">
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-grid"></div>
+
+  <div class="panel panel-single">
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-id-badge"></i></div>
+        <div class="brand-text">
+          <h1 id="empJobLabel" data-i18n="emp_title">Mein Job</h1>
+          <span id="empJobSub" data-i18n="emp_subtitle">Job-Details &amp; Mitarbeiterverwaltung</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="btn-icon" id="empCloseBtn" title="Schließen (ESC)" data-i18n-title="title_close_esc">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="content content-single">
+      <main class="main main-full">
+
+        <nav class="tabs" id="empTabs">
+          <button class="tab active" data-emp-tab="overview"><i class="fa-solid fa-sliders"></i> <span data-i18n="tab_overview">Übersicht</span></button>
+          <button class="tab hidden" id="empEmployeesTabBtn" data-emp-tab="employees"><i class="fa-solid fa-users-gear"></i> <span data-i18n="tab_employees">Mitarbeiterliste</span></button>
+          <button class="tab hidden" id="empJobSettingsTabBtn" data-emp-tab="jobsettings"><i class="fa-solid fa-gear"></i> <span data-i18n="tab_job_settings">Jobeinstellungen</span></button>
+          <button class="tab hidden" id="empApplicationsTabBtn" data-emp-tab="applications"><i class="fa-solid fa-file-signature"></i> <span data-i18n="tab_applications">Bewerbungen</span> <span class="count-pill" id="empApplicationsOpenCount">0</span></button>
+        </nav>
+
+        <section class="tab-content active" id="emp-tab-overview">
+          <div class="card">
+            <div class="card-title"><i class="fa-solid fa-circle-info"></i> <span data-i18n="card_my_job">Meine Job-Details</span></div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-item-label"><i class="fa-solid fa-briefcase"></i> <span data-i18n="info_job">Job</span></span>
+                <span class="info-item-value" id="empJobName">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-item-label"><i class="fa-solid fa-ranking-star"></i> <span data-i18n="info_rank">Rang</span></span>
+                <span class="info-item-value" id="empGrade">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-item-label"><i class="fa-solid fa-sack-dollar"></i> <span data-i18n="th_salary">Gehalt</span></span>
+                <span class="info-item-value" id="empSalary">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-item-label"><i class="fa-solid fa-lock"></i> <span data-i18n="info_status">Status</span></span>
+                <span class="info-badge" id="empWhitelisted">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-item-label"><i class="fa-solid fa-file-signature"></i> <span data-i18n="card_app_phase">Bewerbungsphase</span></span>
+                <span class="info-badge" id="empApplicationsPhase">-</span>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:14px; margin-bottom:0;">
+              <label data-i18n="lbl_description">Beschreibung</label>
+              <p class="info-description" id="empDescription">-</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><i class="fa-solid fa-ranking-star"></i> <span data-i18n="card_career">Karriereleiter</span></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr><th data-i18n="th_grade">Grade</th><th data-i18n="info_rank">Rang</th><th data-i18n="th_salary">Gehalt</th></tr>
+                </thead>
+                <tbody id="empGradesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-content" id="emp-tab-employees">
+          <div class="card">
+            <div class="card-title-row">
+              <div class="card-title"><i class="fa-solid fa-users-gear"></i> <span data-i18n="tab_employees">Mitarbeiterliste</span> <span class="count-pill" id="empEmployeeCount">0</span></div>
+              <button class="btn btn-primary btn-sm" id="empHireBtn">
+                <i class="fa-solid fa-user-plus"></i><span data-i18n="ui_hire_new">Neu einstellen</span>
+              </button>
+            </div>
+
+            <div class="players-list" id="empEmployeesList"></div>
+            <div class="table-empty hidden" id="empEmployeesEmpty">
+              <i class="fa-solid fa-user-slash"></i>
+              <span data-i18n="ui_employees_empty">Keine Mitarbeiter gefunden</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-content" id="emp-tab-jobsettings">
+          <div class="card">
+            <div class="card-title"><i class="fa-solid fa-gear"></i> <span data-i18n="tab_job_settings">Jobeinstellungen</span></div>
+            <div class="form-group">
+              <label data-i18n="lbl_display_name">Anzeigename (Label)</label>
+              <input type="text" id="jsLabel" placeholder="z. B. Polizei" data-i18n-placeholder="ph_e_g_police">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label data-i18n="lbl_job_desc">Jobbeschreibung (sichtbar im Arbeitsamt)</label>
+              <textarea id="jsDescription" rows="4" placeholder="Kurze Beschreibung dieses Jobs..." data-i18n-placeholder="ph_short_desc"></textarea>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary btn-lg" id="jsSaveBtn">
+                <i class="fa-solid fa-floppy-disk"></i><span data-i18n="btn_save">Speichern</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-content" id="emp-tab-applications">
+          <div class="card">
+            <div class="card-title"><i class="fa-solid fa-file-signature"></i> <span data-i18n="card_app_phase">Bewerbungsphase</span></div>
+            <div class="switch-row">
+              <div class="switch-info">
+                <i class="fa-solid fa-door-open"></i>
+                <div>
+                  <strong data-i18n="app_phase_open">Bewerbungsphase geöffnet</strong>
+                  <span data-i18n="app_phase_open_desc">Solange geöffnet, können Spieler im Arbeitsamt eine Bewerbung für diesen Job schreiben</span>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="asOpen">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label data-i18n="lbl_job_ad">Stellenausschreibung (welche Stellen werden gesucht?)</label>
+              <textarea id="asText" rows="3" placeholder="z. B. Wir suchen aktuell Verstärkung im Streifendienst..." data-i18n-placeholder="ph_job_ad"></textarea>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary btn-lg" id="asSaveBtn">
+                <i class="fa-solid fa-floppy-disk"></i><span data-i18n="btn_save">Speichern</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title-row">
+              <div class="card-title"><i class="fa-solid fa-inbox"></i> <span data-i18n="card_received_apps">Eingegangene Bewerbungen</span> <span class="count-pill" id="empApplicationsCount">0</span></div>
+              <button class="btn-icon" id="empApplicationsRefreshBtn" title="Aktualisieren" data-i18n-title="title_refresh">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+            </div>
+            <div class="applications-list" id="empApplicationsList"></div>
+            <div class="table-empty hidden" id="empApplicationsEmpty">
+              <i class="fa-solid fa-inbox"></i>
+              <span data-i18n="apps_empty">Noch keine Bewerbungen eingegangen</span>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+</div>
+
+<div id="jobCenterApp" class="hidden">
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-grid"></div>
+
+  <div class="panel panel-single">
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-building-columns"></i></div>
+        <div class="brand-text">
+          <h1 data-i18n="jc_title">Arbeitsamt</h1>
+          <span data-i18n="jc_subtitle">Aktuellen Job einsehen &amp; einen neuen Job annehmen</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="search-box" id="jcSearchBox">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="jcSearchInput" placeholder="Job suchen..." data-i18n-placeholder="ph_search_job">
+        </div>
+        <button class="btn-icon" id="jcCloseBtn" title="Schließen (ESC)" data-i18n-title="title_close_esc">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="content content-single">
+      <main class="main main-full">
+
+        <div class="card" id="jcMyJobCard">
+          <div class="card-title"><i class="fa-solid fa-id-badge"></i> <span data-i18n="jc_my_job_title">Mein aktueller Job</span></div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-item-label"><i class="fa-solid fa-briefcase"></i> <span data-i18n="info_job">Job</span></span>
+              <span class="info-item-value" id="jcMyJob">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label"><i class="fa-solid fa-ranking-star"></i> <span data-i18n="info_rank">Rang</span></span>
+              <span class="info-item-value" id="jcMyGrade">-</span>
+            </div>
+          </div>
+          <div class="switch-row" id="jcWhitelistNotice">
+            <div class="switch-info">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <div>
+                <strong data-i18n="jc_switch_blocked">Jobwechsel aktuell nicht möglich</strong>
+                <span data-i18n="jc_switch_blocked_desc">Du bist aktuell noch bei einer Fraktion angestellt - lass dich zuerst von deinem Arbeitgeber entlassen, um hier einen neuen Job anzunehmen</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabs" id="jcTabs">
+          <button class="tab active" data-jc-tab="jobs"><i class="fa-solid fa-list-check"></i> <span data-i18n="tab_available_jobs">Verfügbare Jobs</span></button>
+          <button class="tab" data-jc-tab="applications"><i class="fa-solid fa-file-signature"></i> <span data-i18n="tab_applications">Bewerbungen</span></button>
+          <button class="tab" data-jc-tab="myapplications"><i class="fa-solid fa-comments"></i> <span data-i18n="tab_my_applications">Meine Bewerbungen</span> <span class="count-pill" id="jcMyApplicationsCount">0</span></button>
+        </nav>
+
+        <section class="tab-content active" id="jc-tab-jobs">
+          <div class="jc-jobs-list" id="jcJobsList"></div>
+          <div class="table-empty hidden" id="jcJobsEmpty">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span data-i18n="ui_no_apps_found">Keine Jobs gefunden</span>
+          </div>
+        </section>
+
+        <section class="tab-content" id="jc-tab-applications">
+          <div class="jc-jobs-list" id="jcApplyJobsList"></div>
+          <div class="table-empty hidden" id="jcApplyJobsEmpty">
+            <i class="fa-solid fa-inbox"></i>
+            <span data-i18n="jc_no_apply_jobs">Aktuell sucht kein Job neue Mitarbeiter über Bewerbungen</span>
+          </div>
+        </section>
+
+        <section class="tab-content" id="jc-tab-myapplications">
+          <div class="applications-list" id="jcMyApplicationsList"></div>
+          <div class="table-empty hidden" id="jcMyApplicationsEmpty">
+            <i class="fa-solid fa-file-circle-question"></i>
+            <span data-i18n="jc_no_my_apps">Du hast noch keine Bewerbungen geschrieben</span>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="hireModalOverlay">
+  <div class="modal modal-large">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-user-plus"></i> <span data-i18n="hire_title">Neuen Mitarbeiter einstellen</span></h3>
+      <button class="btn-icon" id="hireCloseBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="char-search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="hireSearchInput" placeholder="Spieler nach Name oder Identifier suchen..." data-i18n-placeholder="ph_search_player">
+      </div>
+
+      <div class="char-results" id="hireResults">
+        <div class="table-empty">
+          <i class="fa-solid fa-users-viewfinder"></i>
+          <span data-i18n="ui_hire_hint_players">Suche nach einem Spieler (muss aktuell unemployed, business oder taxi sein)</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="hireCloseBtn2" data-i18n="btn_close">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="gradeModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="gradeModalTitle"><i class="fa-solid fa-ranking-star"></i> <span data-i18n="grade_modal_new">Neuer Rang</span></h3>
+      <button class="btn-icon" id="gmCloseBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-i18n="th_name_internal">Name (intern)</label>
+          <input type="text" id="gmName" placeholder="z. B. recruit" data-i18n-placeholder="ph_e_g_recruit">
+        </div>
+        <div class="form-group">
+          <label data-i18n="lbl_label_display">Label (Anzeige)</label>
+          <input type="text" id="gmLabel" placeholder="z. B. Rekrut" data-i18n-placeholder="ph_e_g_recruit_label">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label data-i18n="lbl_salary_usd">Gehalt ($)</label>
+        <div class="salary-slider-box">
+          <div class="salary-slider-value" id="gmSalaryDisplay">$0</div>
+          <input type="range" id="gmSalarySlider" class="salary-slider" min="0" max="0" step="1" value="0">
+          <div class="salary-slider-scale">
+            <span>$0</span>
+            <span>$1.500 <small data-i18n="step_50">(50er)</small></span>
+            <span>$5.000 <small data-i18n="step_100">(100er)</small></span>
+            <span>$10.000 <small data-i18n="step_200">(200er)</small></span>
+          </div>
+          <div class="salary-quick-btns">
+            <button type="button" class="btn btn-secondary btn-sm" id="gmSalaryPlus100">+100$</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="gmSalaryPlus200">+200$</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label data-i18n="lbl_skin_male">Skin (männlich) - JSON</label>
+        <textarea id="gmSkinMale" rows="3" placeholder="{}"></textarea>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_skin_female">Skin (weiblich) - JSON</label>
+        <textarea id="gmSkinFemale" rows="3" placeholder="{}"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="gmCancelBtn" data-i18n="btn_cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="gmSaveBtn"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="btn_save">Speichern</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="characterModalOverlay">
+  <div class="modal modal-large">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-user-gear"></i> <span data-i18n="char_title">Charakterverwaltung</span></h3>
+      <button class="btn-icon" id="charCloseBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="char-search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="charSearchInput" placeholder="Charakter nach Name oder Identifier suchen..." data-i18n-placeholder="ph_search_char">
+      </div>
+
+      <div class="char-results" id="charResults">
+        <div class="table-empty">
+          <i class="fa-solid fa-users-viewfinder"></i>
+          <span data-i18n="ui_char_hint">Suche nach einem Charakter, um dessen Job zu verwalten</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="charCloseBtn2" data-i18n="btn_close">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="applyModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-file-signature"></i> <span data-i18n="apply_title">Bewerbung schreiben</span></h3>
+      <button class="btn-icon" id="applyCloseBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="apply-target-job" id="applyTargetJob">-</div>
+      <div class="form-group">
+        <label data-i18n="lbl_subject">Betreff</label>
+        <input type="text" id="applySubject" placeholder="z. B. Bewerbung als Streifenpolizist" data-i18n-placeholder="ph_subject" maxlength="100">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_app_text">Bewerbungstext</label>
+        <textarea id="applyBody" rows="6" placeholder="Stelle dich kurz vor und erkläre, warum du gut zu diesem Job passt..." data-i18n-placeholder="ph_app_text" maxlength="1500"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label data-i18n="lbl_greeting">Grußformel (automatisch, nicht änderbar)</label>
+        <input type="text" id="applyGreeting" disabled>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="applyCancelBtn" data-i18n="btn_cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="applySubmitBtn"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="btn_submit_app">Bewerbung absenden</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="appThreadModalOverlay">
+  <div class="modal modal-large">
+    <div class="modal-header">
+      <h3 id="appThreadTitle"><i class="fa-solid fa-comments"></i> <span data-i18n="thread_title">Bewerbung</span></h3>
+      <button class="btn-icon" id="appThreadCloseBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="app-thread-meta">
+        <div class="app-thread-meta-row">
+          <span class="app-thread-meta-label" data-i18n="lbl_subject">Betreff</span>
+          <span class="app-thread-meta-value" id="appThreadSubject">-</span>
+        </div>
+        <div class="app-thread-meta-row">
+          <span class="app-thread-meta-label" data-i18n="info_status">Status</span>
+          <span class="app-status-badge" id="appThreadStatusBadge">-</span>
+        </div>
+      </div>
+
+      <div class="app-thread-original" id="appThreadOriginal"></div>
+
+      <div class="app-thread-manager-actions hidden" id="appThreadManagerActions">
+        <button class="btn btn-secondary btn-sm" data-status="open"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="ui_status_open">Offen</span></button>
+        <button class="btn btn-success btn-sm" data-status="accepted"><i class="fa-solid fa-check"></i> <span data-i18n="btn_accept">Annehmen</span></button>
+        <button class="btn btn-danger btn-sm" data-status="declined"><i class="fa-solid fa-xmark"></i> <span data-i18n="btn_decline">Ablehnen</span></button>
+        <button class="btn btn-danger btn-sm" data-status="declined_final"><i class="fa-solid fa-ban"></i> <span data-i18n="btn_decline_final">Endgültig ablehnen</span></button>
+      </div>
+
+      <div class="app-thread-chat" id="appThreadChat"></div>
+
+      <div class="app-thread-reply" id="appThreadReplyBox">
+        <textarea id="appThreadReplyText" rows="2" placeholder="Antwort schreiben..." data-i18n-placeholder="ph_reply" maxlength="1000"></textarea>
+        <button class="btn btn-primary" id="appThreadReplyBtn"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+      <div class="app-thread-closed-note hidden" id="appThreadClosedNote">
+        <i class="fa-solid fa-lock"></i> <span data-i18n="err_chat_closed">Diese Bewerbung wurde endgültig abgelehnt - der Chat ist geschlossen.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="appThreadCloseBtn2" data-i18n="btn_close">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="confirmModalOverlay">
+  <div class="modal modal-small">
+    <div class="modal-header">
+      <h3 id="confirmTitle"><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="confirm_default_title">Bitte bestätigen</span></h3>
+    </div>
+    <div class="modal-body">
+      <p id="confirmText" data-i18n="confirm_default_text">Bist du sicher?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="confirmCancelBtn" data-i18n="btn_cancel">Abbrechen</button>
+      <button class="btn btn-danger" id="confirmOkBtn"><i class="fa-solid fa-check"></i> <span data-i18n="btn_confirm">Bestätigen</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
